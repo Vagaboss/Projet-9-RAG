@@ -112,6 +112,13 @@ if __name__ == "__main__":
     df["region"] = df["region"].fillna("Île-de-France")
     df["keywords"] = df["keywords"].fillna("[]")
 
+    # Créer une colonne text_to_embed = title + long_description
+    df["text_to_embed"] = (
+        df["title"].fillna("Titre manquant") + ". " +
+        df["long_description"].fillna("")
+    ).str.strip()
+
+
     # 4. Sauvegarde CSV + JSON
     out_csv = DATA_DIR / "events_clean.csv"
     out_json = DATA_DIR / "events_clean.json"
