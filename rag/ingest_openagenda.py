@@ -26,7 +26,7 @@ def clean_text(text):
 
 # --- API OpenAgenda ---
 def get_total(city="Paris", year="2025"):
-    """Récupère le nombre total d'événements pour une ville et une année"""
+    """Récupère le nombre total d'événements pour une ville et une année (par update)"""
     params = {
         "refine": [
             f"location_city:\"{city}\"",
@@ -87,7 +87,7 @@ if __name__ == "__main__":
 
     # 1. Nombre total d'événements
     total = get_total(city, year)
-    print(f"Nombre total d'événements trouvés pour {city} en {year} : {total}")
+    print(f"Nombre total d'événements trouvés (maj en {year}) pour {city} : {total}")
 
     # 2. Récupération paginée
     all_records = []
@@ -98,6 +98,12 @@ if __name__ == "__main__":
 
     # 3. Conversion DataFrame + nettoyage Pandas
     df = pd.DataFrame(all_records)
+
+    # Conversion des dates
+    df["date_start"] = pd.to_datetime(df["date_start"], errors="coerce")
+
+    # Filtrer uniquement les événements qui commencent en 2025
+    df = df[df["date_start"].dt.year == 2025]
 
     # Gestion des valeurs manquantes
     df["title"] = df["title"].fillna("Titre manquant")
@@ -113,5 +119,6 @@ if __name__ == "__main__":
     df.to_csv(out_csv, index=False, encoding="utf-8")
     df.to_json(out_json, orient="records", force_ascii=False, indent=2)
 
-    print(f"{len(df)} événements sauvegardés dans {out_csv} et {out_json}")
+    print(f"{len(df)} événements filtrés (date_start=2025) sauvegardés dans {out_csv} et {out_json}")
+
 
