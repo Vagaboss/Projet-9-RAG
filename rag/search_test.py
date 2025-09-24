@@ -1,55 +1,40 @@
-import faiss
-import json
-import numpy as np
-from mistralai import Mistral
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+from langchain_community.vectorstores import FAISS
+from vector_pipe import MistralEmbeddings
 
-# Charger l’index FAISS
-index = faiss.read_index("data/faiss_index.bin")
+# --- Charger .env ---
+ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(ROOT / ".env", override=True)
 
-# Charger les métadonnées
-with open("data/faiss_metadata.json", "r", encoding="utf-8") as f:
-    metadatas = json.load(f)
+# --- Charger l’index FAISS sauvegardé ---
+store_path = Path("data/faiss_store")
+embeddings = MistralEmbeddings()
+db = FAISS.load_local(str(store_path), embeddings, allow_dangerous_deserialization=True)
 
-print(f"Index chargé avec {index.ntotal} vecteurs")
-
-
-# ✅ Vérification 1 : cohérence index <-> métadonnées
-assert index.ntotal == len(metadatas), (
-    f"Incohérence détectée : {index.ntotal} vecteurs FAISS "
-    f"mais {len(metadatas)} métadonnées"
+# --- Vérification 1 : cohérence index <-> métadonnées ---
+index_size = db.index.ntotal
+metadata_size = len(db.docstore._dict)
+assert index_size == metadata_size, (
+    f"Incohérence détectée : {index_size} vecteurs FAISS "
+    f"mais {metadata_size} métadonnées"
 )
-print("✅ Vérification : tous les vecteurs ont bien une métadonnée associée")
+print(f"✅ Vérification : {index_size} vecteurs et {metadata_size} métadonnées -> cohérents")
 
-# ✅ Vérification 2 : l’index contient bien les 4728 chunks attendus
-expected_count = 4728  # tu peux aussi mettre len(metadatas)
-assert index.ntotal == expected_count, (
-    f"Erreur : attendu {expected_count} chunks, trouvé {index.ntotal}"
+# --- Vérification 2 : nombre de chunks attendus ---
+expected_count = 4728  # ajuster si tu régénères l’index
+assert index_size == expected_count, (
+    f"Erreur : attendu {expected_count} chunks, trouvé {index_size}"
 )
-print(f"✅ Vérification : {index.ntotal} chunks bien indexés dans FAISS")
+print(f"✅ Vérification : {index_size} chunks bien indexés dans FAISS")
 
-
-
-# Requête utilisateur
+# --- Requête utilisateur ---
 query = "concert de musique classique à Paris en avril 2025"
-
-# Obtenir embedding de la requête
-api_key = os.getenv("MISTRAL_API_KEY")
-client = Mistral(api_key=api_key)
-
-response = client.embeddings.create(
-    model="mistral-embed",
-    inputs=[query]
-)
-
-query_vector = np.array(response.data[0].embedding, dtype="float32").reshape(1, -1)
-
-# Recherche FAISS
-k = 5  # nombre de résultats
-distances, indices = index.search(query_vector, k)
+results = db.similarity_search(query, k=5)
 
 print("\nRésultats de recherche :")
-for idx, dist in zip(indices[0], distances[0]):
-    meta = metadatas[idx]
-    print(f"- {meta['title']} ({meta['date_start']}) [{meta['url']}]")
-    print(f"  Distance: {dist:.4f}")
+for r in results:
+    print(f"- {r.metadata.get('title')} ({r.metadata.get('date_start')}) [{r.metadata.get('url')}]")
+    print(f"  Extrait: {r.page_content[:200]}...\n")
+

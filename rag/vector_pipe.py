@@ -1,14 +1,16 @@
 import os
-import json
-import time
-import numpy as np
-import faiss
 from pathlib import Path
 from pprint import pprint
 from tqdm import tqdm
+import time
+
+from langchain_core.embeddings import Embeddings
 from langchain_community.document_loaders import JSONLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
 from mistralai import Mistral
+from dotenv import load_dotenv
+load_dotenv()
 
 # --- Fonction pour extraire les métadonnées ---
 def metadata_extractor(record, metadata):
@@ -22,6 +24,38 @@ def metadata_extractor(record, metadata):
         "region": record.get("region"),
         "keywords": record.get("keywords"),
     }
+
+# --- Wrapper embeddings Mistral ---
+class MistralEmbeddings(Embeddings):
+    def __init__(self, model="mistral-embed"):
+        api_key = os.getenv("MISTRAL_API_KEY")
+        if not api_key:
+            raise ValueError("⚠️ La clé API Mistral n'est pas définie.")
+        self.client = Mistral(api_key=api_key)
+        self.model = model
+
+    def embed_documents(self, texts):
+        """Embeddings pour une liste de documents"""
+        embeddings = []
+        batch_size = 50
+        for i in tqdm(range(0, len(texts), batch_size), desc="Embedding batches"):
+            batch = texts[i:i+batch_size]
+            response = self.client.embeddings.create(
+                model=self.model,
+                inputs=batch
+            )
+            embeddings.extend([e.embedding for e in response.data])
+            time.sleep(1)  # respecter limite 1 req/sec
+        return embeddings
+
+    def embed_query(self, text):
+        """Embedding pour une seule requête"""
+        response = self.client.embeddings.create(
+            model=self.model,
+            inputs=[text]
+        )
+        return response.data[0].embedding
+
 
 if __name__ == "__main__":
     # --- Charger les données JSON ---
@@ -43,55 +77,15 @@ if __name__ == "__main__":
     )
     split_docs = splitter.split_documents(docs)
     print(f"Nombre de chunks générés : {len(split_docs)}")
-    print("Exemple chunk :", split_docs[0].page_content[:200], "...")
-    print("Exemple metadata :", split_docs[0].metadata)
 
-    # --- Préparer les textes et métadonnées ---
-    texts = [d.page_content for d in split_docs]
-    metadatas = [d.metadata for d in split_docs]
+    # --- Créer l’index FAISS avec LangChain ---
+    embeddings = MistralEmbeddings()
+    db = FAISS.from_documents(split_docs, embeddings)
 
-    # --- Initialiser le client Mistral ---
-    api_key = os.getenv("MISTRAL_API_KEY")
-    if not api_key:
-        raise ValueError("⚠️ La clé API Mistral n'est pas définie.")
+    # --- Sauvegarder l’index ---
+    store_path = Path("data/faiss_store")
+    db.save_local(str(store_path))
+    print(f"💾 Index FAISS + métadonnées sauvegardé dans {store_path}")
 
-    client = Mistral(api_key=api_key)
-
-    # --- Vectorisation avec batching ---
-    print("Vectorisation avec Mistral en cours...")
-    batch_size = 50
-    all_embeddings = []
-
-    for i in tqdm(range(0, len(texts), batch_size), desc="Embedding batches"):
-        batch = texts[i:i+batch_size]
-        response = client.embeddings.create(
-            model="mistral-embed",
-            inputs=batch
-        )
-        all_embeddings.extend([e.embedding for e in response.data])
-        time.sleep(1)  # respecter la limite 1 req/sec
-
-    vectors = np.array(all_embeddings, dtype="float32")
-    print(f"✅ {vectors.shape[0]} embeddings générés")
-
-    # --- Création de l’index FAISS ---
-    dimension = vectors.shape[1]
-    index = faiss.IndexFlatL2(dimension)
-    index.add(vectors)
-    print(f"✅ {index.ntotal} chunks indexés dans FAISS")
-
-    # --- Sauvegarde ---
-    data_dir = Path("data")
-    data_dir.mkdir(exist_ok=True)
-
-    faiss_index_path = data_dir / "faiss_index.bin"
-    faiss.write_index(index, str(faiss_index_path))
-
-    metadata_path = data_dir / "faiss_metadata.json"
-    with open(metadata_path, "w", encoding="utf-8") as f:
-        json.dump(metadatas, f, ensure_ascii=False, indent=2)
-
-    print(f"💾 Index FAISS sauvegardé dans {faiss_index_path}")
-    print(f"💾 Métadonnées sauvegardées dans {metadata_path}")
 
 
