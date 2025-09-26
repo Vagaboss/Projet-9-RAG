@@ -88,4 +88,40 @@ if __name__ == "__main__":
     print(f"💾 Index FAISS + métadonnées sauvegardé dans {store_path}")
 
 
+# fonction rebuild pour API
+def rebuild_faiss():
+    """
+    Reconstruit l’index FAISS à partir du fichier events_clean.json
+    et le sauvegarde dans data/faiss_store.
+    """
+    print("🔄 Reconstruction de l’index FAISS en cours...")
+
+    # --- Charger les données JSON ---
+    loader = JSONLoader(
+        file_path="./data/events_clean.json",
+        jq_schema=".[]",
+        content_key="text_to_embed",
+        metadata_func=metadata_extractor
+    )
+    docs = loader.load()
+    print(f"Documents chargés : {len(docs)}")
+
+    # --- Split en chunks ---
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=500,
+        chunk_overlap=50
+    )
+    split_docs = splitter.split_documents(docs)
+    print(f"Nombre de chunks générés : {len(split_docs)}")
+
+    # --- Créer l’index FAISS avec LangChain ---
+    embeddings = MistralEmbeddings()
+    db = FAISS.from_documents(split_docs, embeddings)
+
+    # --- Sauvegarder l’index ---
+    store_path = Path("data/faiss_store")
+    db.save_local(str(store_path))
+
+    print(f"✅ Index FAISS reconstruit et sauvegardé dans {store_path}")
+    return store_path
 

@@ -1,0 +1,42 @@
+[
+  {
+    "question": "Quels concerts de musique classique en avril 2025 à Paris ?",
+    "ground_truth": "Concert de l'Ensemble Marani le 6 avril 2025 à 17h30 à l'Eglise du Val-de-Grâce"
+  },
+  {
+    "question": "Y a-t-il un hommage à Beethoven en 2025 ?",
+    "ground_truth": "Hommage à Beethoven le 21 juin 2025 à 20h à la Mairie du 9e"
+  },
+  {
+    "question": "Quels matchs de basket ball de la ligue Pro A ?",
+    "ground_truth": "Aucun evenement trouvé"
+  },
+  {
+    "question": "Je cherche une exposition d’art autour de Jeanne d'arc en mai 2025",
+    "ground_truth": " Visite libre de l'exposition Jeanne d'Arc le 17 mai 2025 à 14h à Archives nationales - Site de Paris"
+  },
+  {
+    "question": "Je cherche une exposition de Brian maguire à Paris en mai 2025",
+    "ground_truth": "l'Exposition de Brian Maguire le 17 mai 2025 à 14h au centre culturel Irlandais"
+  },
+  {
+    "question": "Je cherche un atelier jeux vidéos en octobre 2025 ?",
+    "ground_truth": "Atelier jeux vidéos le 4 octobre 2025 à 15h à la Médiathèque James Baldwin"
+  },
+  {
+    "question": "Quels ateliers bd manga en octobre 2025 ?",
+    "ground_truth": "Atelier création de personnages BD/ Manga le 4 octobre 2025 à 14h à la Bibliothèque Jacqueline Dreyfus-Weill"
+  },
+  {
+    "question": "Un concert de gospel jazz est-il prévu en juin 2025 à Paris ?",
+    "ground_truth": "Concert de gospel jazz le 21 juin 2025 à 18h30 au 132 avenue de versailles"
+  },
+  {
+    "question": "Des événements autour du roller et skate en juin 2025 à Paris ?",
+    "ground_truth": "Roller skate block party le 21 juin 2025 à 20h au playground porte des Lilas"
+  },
+  {
+    "question": "Une visite guidée d'une bibliothèque en septembre 2025 ?",
+    "ground_truth": "Visite guidée de la Bibliothèque littéraire Jacques-Doucet le 20 septembre 2025 à 14h à Paris"
+  }
+]

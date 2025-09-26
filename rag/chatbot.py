@@ -9,7 +9,13 @@ from langchain_core.language_models import LLM
 from pydantic import Field, ConfigDict
 from mistralai import Mistral
 
-from vector_pipe import MistralEmbeddings
+try:
+    # Cas où on lance directement python rag/chatbot.py
+    from vector_pipe import MistralEmbeddings
+except ImportError:
+    # Cas où on passe par le package (api.main -> rag.chatbot)
+    from rag.vector_pipe import MistralEmbeddings
+
 
 # --- Charger variables d'environnement ---
 ROOT = Path(__file__).resolve().parents[1]
