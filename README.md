@@ -77,3 +77,23 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from mistralai.client import MistralClient
 
 Si aucune erreur ne s’affiche ✅ → l’environnement est prêt.
+
+
+
+📊 Résultats obtenus
+
+Answer relevancy : 0.56
+→ Dans un peu plus de la moitié des cas, la réponse est jugée pertinente par rapport à la question.
+→ C’est “moyen”, mais logique pour un POC (on n’a pas encore optimisé le prompt, le retriever ou les embeddings).
+
+Faithfulness : 0.59
+→ La réponse respecte le contexte fourni dans ~60% des cas.
+→ En clair : le bot a tendance à inventer ou extrapoler parfois.
+
+Context precision : 0.10
+→ Seulement 10% du contexte fourni est réellement utilisé pour générer la réponse.
+→ Ça veut dire que ton retriever envoie beaucoup de “bruit” (docs non pertinents).
+
+Context recall : 0.18
+→ Seulement 18% des infos pertinentes du contexte sont utilisées.
+→ Donc soit le retriever ne trouve pas toujours les bons passages, soit le modèle ne les exploite pas bien.

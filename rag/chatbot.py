@@ -86,7 +86,8 @@ qa_chain = RetrievalQA.from_chain_type(
     llm=llm,
     retriever=retriever,
     chain_type="stuff",
-    chain_type_kwargs={"prompt": prompt}
+    chain_type_kwargs={"prompt": prompt},
+    return_source_documents=True
 )
 
 # --- Fonction réutilisable ---
