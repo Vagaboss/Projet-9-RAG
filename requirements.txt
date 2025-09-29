@@ -29,3 +29,5 @@ datasets
 evaluate
 bs4
 pydantic
+tqdm
+langchain-huggingface

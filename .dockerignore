@@ -1,0 +1,12 @@
+.env
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.git
+.gitignore
+.data/
+**/.ipynb_checkpoints
+**/.DS_Store
