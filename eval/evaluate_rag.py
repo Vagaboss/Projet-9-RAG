@@ -5,6 +5,7 @@ import json
 import requests
 from pathlib import Path
 from dotenv import load_dotenv
+import time
 
 from datasets import Dataset
 from ragas import evaluate
@@ -80,6 +81,9 @@ for q in questions:
         answers.append("")
         contexts.append([])
 
+    # 🔑 respecter limite : 1 requête / seconde
+    time.sleep(1)
+
 # ---------- HF Dataset ----------
 hf_ds = Dataset.from_dict({
     "question": questions,
@@ -101,7 +105,7 @@ else:
     metrics = [answer_relevancy]
 
 # ---------- Evaluation (limiter la concurrence !) ----------
-run_cfg = RunConfig(max_workers=1)  # crucial pour Mistral (1 req/s)
+run_cfg = RunConfig(max_workers=1, timeout=120)  # crucial pour Mistral (1 req/s)
 
 results = evaluate(
     hf_ds,
