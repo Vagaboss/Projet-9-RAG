@@ -1,20 +1,53 @@
 # Projet 9 chatbot ia RAG
 
-### 🎯 Objectif
+## 🎯 Objectif
 
-Ce dépôt contient le Proof of Concept d’un chatbot RAG (Retrieval-Augmented Generation) pour recommander des événements culturels à partir de l’API OpenAgenda, en utilisant LangChain, Mistral et Faiss.
+Ce projet a pour objectif de développer un système RAG (Retrieval-Augmented Generation) permettant de répondre en langage naturel à des questions sur des événements culturels et professionnels issus d’OpenAgenda.
+L’utilisateur peut poser une question comme : 
 
-Ce document décrit uniquement l’installation de l’environnement de développement pour pouvoir exécuter les prochains scripts (ingestion, vectorisation, API).
+ "Quels concerts de musique classique en avril 2025 à Paris ?".
 
-### 🛠️ Prérequis
+Le système va alors :
+- Rechercher les événements pertinents dans une base vectorielle construite avec FAISS.
 
-- Python ≥ 3.8 installé sur la machine (testé avec Python 3.13.3)
 
-- Git installé
+- Générer une réponse claire et contextualisée grâce au modèle de langage Mistral.
 
-- Une connexion Internet pour télécharger les dépendances
 
-- Système : Windows (fonctionne aussi sous Linux/Mac avec adaptations mineures)
+- Fournir la réponse via une API REST exposée avec FastAPI.
+
+## 📂 Structure du projet
+
+api/main.py : API FastAPI avec les endpoints /ask, /rebuild et /health
+
+
+rag/chatbot.py : Chaîne RAG qui combine FAISS + Mistral
+
+
+rag/vector_pipe.py : Prétraitement des données et construction de l’index FAISS
+
+
+scripts/build_index.py : Script pour reconstruire l’index FAISS
+
+
+eval/eval_data.json : Jeu de test avec questions et réponses attendues
+
+
+eval/evaluate_rag.py : Script d’évaluation avec Ragas
+
+
+data/events_clean.json : Données sources nettoyées
+
+
+requirements.txt : Dépendances Python
+
+
+Dockerfile : Conteneurisation de l’API
+
+
+README.md : Présentation du projet
+
+
 
 ### 📦 Installation
 1. Cloner le projet
@@ -42,43 +75,54 @@ source env/Scripts/activate
 
 3. Installer les dépendances
 
-- pip install -r requirements.txt
+4. Définir la clé API Mistral
+Créer un fichier .env à la racine du projet et ajouter :
+ MISTRAL_API_KEY=ta_clef_api
 
-- Les principales bibliothèques installées sont :
+5. Construire l’index FAISS
+python scripts/build_index.py
 
-- faiss-cpu (vectorisation)
+6. Lancer l’API FastAPI
+uvicorn api.main:app --reload
+Endpoints accessibles :
+- Docs interactives : http://127.0.0.1:8000/docs
+- Healthcheck : http://127.0.0.1:8000/health
 
-- langchain et langchain-community
+7. Exemple d’appel API :
 
-- mistralai
-
-- transformers, torch, sentence-transformers
-
-- fastapi, uvicorn
-
-- pytest, python-dotenv
-
-4. Vérifier que l’environnement est bien activé
-
-which python
-ou
-python -c "import sys; print(sys.prefix)"
-
-Le chemin doit pointer vers le dossier du projet, par ex. :
-.../Projet 9 RAG/env
-
-5. Tester les imports
-
-- Dans le shell Python :
-
-import faiss
-from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from mistralai.client import MistralClient
-
-Si aucune erreur ne s’affiche ✅ → l’environnement est prêt.
+POST /ask
+{ "question": "Quels concerts de musique classique en avril 2025 à Paris ?" }
 
 
+## 🐳 Exécution avec Docker
+
+1. Builder l’image
+docker build -t rag-api .
+2. Lancer le conteneur
+docker run -p 8000:8000 rag-api
+3. Accéder à l’API
+Swagger : http://127.0.0.1:8000/docs
+
+## 📊 Évaluation avec Ragas
+Lancer l’évaluation
+python -m eval.evaluate_rag
+Exemple de résultats
+Answer relevancy : 0.56
+
+
+Faithfulness : 0.59
+
+
+Context precision : 0.10
+
+
+Context recall : 0.18
+
+
+Ces résultats montrent que le système est pertinent mais qu’il peut encore être amélioré, notamment sur la couverture contextuelle.
+
+## 👨‍💻 Auteur
+Projet réalisé dans le cadre de la formation Data Scientist – OpenClassrooms.
 
 📊 Résultats obtenus
 

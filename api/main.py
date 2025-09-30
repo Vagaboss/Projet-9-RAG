@@ -63,9 +63,3 @@ def rebuild():
     """Reconstruit l’index FAISS à partir des données JSON (events_clean.json)."""
     store_path = rebuild_faiss()
     return {"status": f"Index reconstruit et sauvegardé dans {store_path}"}
-
-
-# --- Endpoint welcome ---
-@app.get("/")
-def root():
-    return {"message": "Bienvenue dans l'API RAG 🚀. Consultez /docs pour tester."}
