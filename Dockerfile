@@ -11,8 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Étape 4 : copier le code de ton projet
 COPY . .
 
-# Étape 5 : builder l’index FAISS au démarrage (optionnel, sinon tu peux le faire à la main)
-#RUN python -m scripts.build_index || true
+# Étape 5 : vérifier si l’index FAISS existe, sinon le construire
+RUN test -d data/faiss_store || python -m scripts.build_index
 
 # Étape 6 : exposer le port de l’API
 EXPOSE 8000
