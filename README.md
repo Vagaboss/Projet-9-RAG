@@ -52,8 +52,8 @@ README.md : Présentation du projet
 ### 📦 Installation
 1. Cloner le projet
 
-- git clone <url-du-repo>
-- cd puls-events-rag
+- git clone <https://github.com/Vagaboss/Projet-9-RAG.git>
+- cd Projet-9-RAG
 
 2. Créer un environnement virtuel
 
@@ -77,7 +77,7 @@ source env/Scripts/activate
 
 4. Définir la clé API Mistral
 Créer un fichier .env à la racine du projet et ajouter :
- MISTRAL_API_KEY=ta_clef_api
+ MISTRAL_API_KEY=ta_clef_api (recupéré sur le site de mistralai : prendre l'abonnement gratuit)
 
 5. Construire l’index FAISS
 python scripts/build_index.py
@@ -99,11 +99,12 @@ POST /ask
 1. Builder l’image
 docker build -t rag-api .
 2. Lancer le conteneur
-docker run -p 8000:8000 rag-api
-3. Accéder à l’API
+docker run -p 8000:8000 --env-file .env rag-api
+3. Accéder à l’API dans le docker
 Swagger : http://127.0.0.1:8000/docs
 
 ## 📊 Évaluation avec Ragas
+Verifier que l'api est bien lancée
 Lancer l’évaluation
 python -m eval.evaluate_rag
 Exemple de résultats
@@ -121,8 +122,7 @@ Context recall : 0.18
 
 Ces résultats montrent que le système est pertinent mais qu’il peut encore être amélioré, notamment sur la couverture contextuelle.
 
-## 👨‍💻 Auteur
-Projet réalisé dans le cadre de la formation Data Scientist – OpenClassrooms.
+
 
 📊 Résultats obtenus
 
@@ -141,3 +141,6 @@ Context precision : 0.10
 Context recall : 0.18
 → Seulement 18% des infos pertinentes du contexte sont utilisées.
 → Donc soit le retriever ne trouve pas toujours les bons passages, soit le modèle ne les exploite pas bien.
+
+## 👨‍💻 Auteur
+Projet réalisé dans le cadre de la formation Data Scientist – OpenClassrooms.
