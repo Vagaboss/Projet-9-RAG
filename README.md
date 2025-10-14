@@ -1,5 +1,11 @@
 # Projet 9 chatbot ia RAG
 
+
+## Lien github
+
+https://github.com/Vagaboss/Projet-9-RAG 
+
+.
 ## 🎯 Objectif
 
 Ce projet a pour objectif de développer un système RAG (Retrieval-Augmented Generation) permettant de répondre en langage naturel à des questions sur des événements culturels et professionnels issus d’OpenAgenda.
