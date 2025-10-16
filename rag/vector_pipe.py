@@ -3,7 +3,7 @@ from pathlib import Path
 from pprint import pprint
 from tqdm import tqdm
 import time
-
+from mistralai import models
 from langchain_core.embeddings import Embeddings
 from langchain_community.document_loaders import JSONLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -49,12 +49,20 @@ class MistralEmbeddings(Embeddings):
         return embeddings
 
     def embed_query(self, text):
-        """Embedding pour une seule requête"""
-        response = self.client.embeddings.create(
-            model=self.model,
-            inputs=[text]
-        )
-        return response.data[0].embedding
+        for _ in range(3):  # jusqu’à 3 tentatives
+            try:
+                response = self.client.embeddings.create(
+                    model=self.model,
+                    inputs=[text]
+                )
+                return response.data[0].embedding
+            except models.SDKError as e:
+                if "capacity" in str(e) or "429" in str(e):
+                    print("⚠️ API Mistral saturée, nouvelle tentative dans 5 secondes...")
+                    time.sleep(5)
+                    continue
+                raise
+        raise RuntimeError("Échec de l’embedding après plusieurs tentatives")
 
 
 if __name__ == "__main__":

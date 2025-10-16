@@ -1,141 +1,125 @@
-"""
-evaluate_ragas.py — Évaluation RAGAS utilisant Mistral comme LLM d'évaluation
-"""
-
-import sys
 import os
+import sys
 import json
 import time
-import random
-import logging
-import warnings
+import requests
+from pathlib import Path
+from dotenv import load_dotenv
+
 from datasets import Dataset
 from ragas import evaluate
-from ragas.metrics import faithfulness, answer_similarity, context_precision, context_recall
-from ragas.llms import LangchainLLMWrapper
-from langchain_mistralai.chat_models import ChatMistralAI
-from mistralai.client import MistralClient
-from mistralai.models.chat_completion import ChatMessage
+from ragas.metrics import answer_relevancy, faithfulness, context_precision, context_recall
+from ragas.run_config import RunConfig
 
-# --- Charger les modules du projet ---
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from utils.config import MISTRAL_API_KEY, MODEL_NAME, SEARCH_K
-from utils.vector_store import VectorStoreManager
+from mistralai import Mistral
+from langchain_core.language_models import LLM
+from pydantic import Field, ConfigDict
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
-# --- Configuration générale ---
-warnings.filterwarnings("ignore", category=UserWarning)
-warnings.filterwarnings("ignore", category=DeprecationWarning)
+# --- Config ---
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.append(str(ROOT))
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
+load_dotenv(ROOT / ".env", override=True)
 
-# --- Initialisation du client Mistral et du Vector Store ---
-client = MistralClient(api_key=MISTRAL_API_KEY)
-vector_store_manager = VectorStoreManager()
+API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/ask")
+EVAL_FILE = ROOT / "eval" / "eval_data.json"
+EVAL_MODEL = os.getenv("EVAL_MODEL", "mistral-small-2503")
+EMB_MODEL = os.getenv("EVAL_EMB_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 
-# --- Prompt système ---
-SYSTEM_PROMPT = """Tu es 'NBA Analyst AI', un assistant expert de la NBA.
-Tu réponds aux questions des analystes en t'appuyant sur les données contextuelles suivantes :
+# --- Wrapper LLM Mistral pour Ragas ---
+class MistralChatWrapper(LLM):
+    client: object = Field(...)
+    model: str
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-{context_str}
+    @property
+    def _llm_type(self) -> str:
+        return "mistral-chat"
 
-Question : {question}
-Réponse :
-"""
+    def _call(self, prompt: str, stop=None, run_manager=None, **kwargs):
+        messages = [
+            {"role": "system", "content": "Tu es un évaluateur. Juge la qualité des réponses RAG."},
+            {"role": "user", "content": prompt},
+        ]
+        resp = self.client.chat.complete(model=self.model, messages=messages)
+        return resp.choices[0].message.content.strip()
 
-# --- Fonction principale pour obtenir réponse + contexte ---
-def get_answer_and_context(question: str):
+# --- Charger le jeu de test ---
+with open(EVAL_FILE, "r", encoding="utf-8") as f:
+    eval_rows = json.load(f)
+
+questions = [r["question"] for r in eval_rows]
+ground_truths = [r["ground_truth"] for r in eval_rows]
+
+answers = []
+contexts = []
+has_any_context = False
+
+# --- Interroger l’API en respectant les limites ---
+for q in questions:
     try:
-        logging.info(f"Recherche de contexte pour la question : {question}")
-        search_results = vector_store_manager.search(question, k=SEARCH_K)
+        resp = requests.post(API_URL, json={"question": q}, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
 
-        context_str = "\n\n---\n\n".join([
-            f"Source: {res['metadata'].get('source', 'Inconnue')} (Score: {res['score']:.1f}%)\nContenu: {res['text']}"
-            for res in search_results
-        ]) if search_results else "Aucun contexte pertinent trouvé."
+        answers.append(data.get("answer", ""))
 
-        final_prompt = SYSTEM_PROMPT.format(context_str=context_str, question=question)
-        messages = [ChatMessage(role="user", content=final_prompt)]
-
-        # Pause pour éviter le “Too Many Requests”
-        time.sleep(random.uniform(2.5, 5.0))
-
-        response = client.chat(model=MODEL_NAME, messages=messages, temperature=0.1)
-        answer = response.choices[0].message.content if response.choices else "Réponse vide."
-
-        return answer, context_str
+        ctx_texts = []
+        for s in data.get("sources", []):
+            if isinstance(s, dict) and isinstance(s.get("page_content"), str):
+                ctx_texts.append(s["page_content"])
+        if ctx_texts:
+            has_any_context = True
+        contexts.append(ctx_texts)
 
     except Exception as e:
-        logging.error(f"Erreur pendant la génération pour '{question}': {e}")
-        return "", ""
+        print(f"⚠️ Erreur API pour `{q}` -> {e}")
+        answers.append("")  # toujours remplir
+        contexts.append([])
 
-# --- Charger le jeu d’évaluation ---
-EVAL_FILE = os.path.join("eval", "eval_data.json")
-if not os.path.exists(EVAL_FILE):
-    raise FileNotFoundError("❌ Fichier eval_data.json introuvable dans le dossier 'eval/'")
+    # 🔑 respecter limite : 1 requête / seconde
+    time.sleep(3)
 
-with open(EVAL_FILE, "r", encoding="utf-8") as f:
-    eval_data = json.load(f)
-
-questions, answers, contexts, ground_truths = [], [], [], []
-
-# --- Boucle principale ---
-for i, item in enumerate(eval_data, 1):
-    q = item["question"]
-    gt = item["ground_truth"]
-
-    logging.info(f"\n🧠 ({i}/{len(eval_data)}) Question : {q}")
-    answer, ctx = get_answer_and_context(q)
-
-    questions.append(q)
-    answers.append(answer)
-    contexts.append([ctx])  # ✅ Chaque contexte doit être une liste
-    ground_truths.append(gt)
-
-# --- Créer le Dataset compatible RAGAS ---
-dataset = Dataset.from_dict({
+# --- Construire Dataset HF ---
+hf_ds = Dataset.from_dict({
     "question": questions,
     "answer": answers,
     "contexts": contexts,
-    "ground_truth": ground_truths
+    "ground_truth": ground_truths,
 })
 
-# --- Configurer Mistral comme LLM d’évaluation ---
-llm_for_ragas = LangchainLLMWrapper(
-    ChatMistralAI(api_key=MISTRAL_API_KEY, model=MODEL_NAME)
+# --- LLM + embeddings ---
+mistral_client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
+llm = MistralChatWrapper(client=mistral_client, model=EVAL_MODEL)
+
+embeddings = HuggingFaceEmbeddings(
+    model_name=EMB_MODEL,
+    encode_kwargs={"normalize_embeddings": True}
 )
 
-# --- Calcul des métriques RAGAS ---
-logging.info("📊 Calcul des métriques RAGAS avec Mistral...")
+# --- Choix des métriques ---
+if has_any_context:
+    metrics = [answer_relevancy, faithfulness, context_precision, context_recall]
+else:
+    print("ℹ️ Aucun `page_content` détecté ; évaluation limitée à `answer_relevancy`.")
+    metrics = [answer_relevancy]
+
+# --- Lancer l’évaluation ---
+run_cfg = RunConfig(max_workers=1, timeout=120)
+
 results = evaluate(
-    dataset=dataset,
-    metrics=[faithfulness, answer_similarity, context_precision, context_recall],
-    llm=llm_for_ragas
+    hf_ds,
+    metrics=metrics,
+    llm=llm,
+    embeddings=embeddings,
+    run_config=run_cfg,
+    show_progress=True,
+    raise_exceptions=False,
 )
 
-# --- Afficher les résultats ---
-print("\n===== 📈 RÉSULTATS RAGAS (Évaluation via Mistral) =====")
-for metric, value in results.items():
-    print(f"{metric}: {value:.3f}")
+print("\n=== Résultats Ragas ===")
+print(results)
 
-# --- Sauvegarder les résultats ---
-RESULTS_PATH = os.path.join("eval", "results.json")
-results_data = {
-    "metrics": {k: float(v) for k, v in results.items()},
-    "details": [
-        {
-            "question": q,
-            "answer": a,
-            "ground_truth": gt,
-            "context": c[0]
-        }
-        for q, a, gt, c in zip(questions, answers, ground_truths, contexts)
-    ]
-}
 
-with open(RESULTS_PATH, "w", encoding="utf-8") as f:
-    json.dump(results_data, f, indent=4, ensure_ascii=False)
 
-logging.info(f"✅ Résultats enregistrés dans {RESULTS_PATH}")
